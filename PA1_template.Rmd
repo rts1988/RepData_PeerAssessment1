@@ -1,25 +1,185 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Submission for Course5 Week1"
+author: "Arati"
+date: "December 10, 2018"
+output: html_document
 ---
 
+## 1. Loading data 
 
-## Loading and preprocessing the data
+Loading activity.csv into a dataframe and looking at contents:
+
+```{r, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE, fig.path='figure/')
+setwd("C:/Users/Arati/Documents/R_studying/Course5/repdata_data_activity")
+ac <- read.csv("activity.csv")
+sapply(ac,class)
+head(ac)
+```
+
+##2.  What is mean total number of steps taken per day?
+
+```{r, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+### Calculate total number of steps per day
+
+```{r, include=TRUE, results=TRUE}
+steps_byday <- ac %>% group_by(date) %>% summarize(steps_count = sum(steps,na.rm=TRUE))
+head(steps_byday)
+```
+
+### Plotting histogram of total steps per day
+
+```{r, include=TRUE, results=TRUE}
+with(steps_byday,hist(steps_count,breaks=5,col="red",main="Histogram of total steps by day"))
+abline(v=mean(steps_byday$steps_count,na.rm=TRUE),col="blue",lwd=3)
+abline(v=median(steps_byday$steps_count,na.rm=TRUE),col="green",lwd=3)
+rug(steps_byday$steps_count)
+legend("topright",legend=c("Mean","Median"),col=c("blue","green"),lwd=3)
+```
 
 
+### Calculating mean and median total steps per day
 
-## What is mean total number of steps taken per day?
+```{r, include=TRUE, results=TRUE}
+mean_steps_ignorena <- mean(steps_byday$steps_count)
+median_steps_ignorena <- median(steps_byday$steps_count)
+mean_steps_removena <- mean(steps_byday$steps_count,na.rm=TRUE)
+median_steps_removeena <- median(steps_byday$steps_count,na.rm=TRUE)
+print(mean_steps_ignorena)
+print(mean_steps_removena)
+print(median_steps_ignorena)
+print(median_steps_removeena)
+```
 
+##2. What is the average daily activity pattern?
 
+### Calculating the mean steps per interval over all days
+```{r,inclue=TRUE,results=TRUE}
+mnsteps <- ac %>% group_by(interval) %>% summarize(meansteps=mean(steps,na.rm=TRUE))
+head(mnsteps)
+```
 
-## What is the average daily activity pattern?
+### Plotting time series plot of mean steps per interval in a day
 
+```{r,include=TRUE, results=TRUE}
+h <- mnsteps$interval%/%100
+m <- mnsteps$interval%%100
+mnsteps$timestamp <- strptime(as.character(paste(h,m)),"%H%M")
+with(mnsteps,plot(timestamp,meansteps,type="l"))
+```
 
+### Finding time interval at which the average steps taken was highest
 
-## Imputing missing values
+```{r, include=TRUE,results=TRUE}
+maxsteps <- max(mnsteps$meansteps)
+maxstepstime <- mnsteps$timestamp[which(mnsteps$meansteps == maxsteps)]
+print(maxsteps)
+print(strftime(maxstepstime,"%H-%M"))
+```
 
+## 3. Imputing missing values
 
+### Total number of missing steps values
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r,include=TRUE, results=TRUE}
+n_nasteps <- length(which(is.na(ac$steps)))
+print(n_nasteps)
+```
+
+### Strategy for imputing missing values:
+Strategy one: impute missing values with the following formulae:
+1. Mean steps for that day
+2. Mean steps for that interval over all days
+
+The above three strategies will be compared by computing the total steps per day and comparing with the missing value data set.
+
+1. Mean steps for that day
+```{r, include = TRUE, results = TRUE}
+ac1 <- ac
+ind <- which(is.na(ac1$steps))
+ac1$steps1 <- ac1$steps
+for (i in ind) {
+  datelookupvalue <- ac1$date[i]
+  datematchindex <- which(steps_byday$date==datelookupvalue)
+  ac1$steps1[i] <- steps_byday$steps_count[datematchindex]
+}
+head(ac1)
+```
+
+2. Computing mean values for interval over all days
+```{r, include = TRUE, results = TRUE}
+ac2 <- ac
+head(ac2)
+ac2$steps2 <- ac2$steps
+for (i in ind) {
+  intervallookupvalue <- ac2$interval[i]
+  intervalmatchindex <- which(mnsteps$interval==intervallookupvalue)
+  ac2$steps2[i] <- mnsteps$meansteps[intervalmatchindex]
+}
+head(ac2)
+```
+
+### Comparing the mean, median and histograms for the two imputing strategies.
+#### Strategy 1. Mean steps for that day
+```{r, include=TRUE, results=TRUE}
+steps_byday1 <- ac1 %>% group_by(date) %>% summarize(steps_count1 = sum(steps1))
+head(steps_byday1)
+meansteps1 <- mean(steps_byday1$steps_count1)
+mediansteps1 <- median(steps_byday1$steps_count1)
+hist(steps_byday$steps_count,col=rgb(1,0,0,0.5),ylim=c(0,30))
+hist(steps_byday1$steps_count1,col=rgb(0,1,0,0.5),add=T)
+legend("topright",legend=c("no imputation","imputed mean steps for the day"),col=c(rgb(1,0,0),rgb(0,1,0)),lwd=3)
+abline(v=meansteps1,col="green",lwd=3)
+abline(v=mean_steps_ignorena,col="red",lwd=3)
+abline(v=mediansteps1,col="green",lty=2,lwd=3)
+abline(v=median_steps_ignorena,col="red",lty=2,lwd=3)
+print(meansteps1)
+print(mean_steps_ignorena)
+print(mediansteps1)
+print(median_steps_ignorena)
+```
+
+Strategy 1 (i.e imputing missing data with the mean of the day) predictably gives you the same mean and median values of total steps per day.
+The time-series plot might well look different. 
+
+#### Strategy2. Mean steps for that interval
+```{r, include=TRUE, results=TRUE}
+steps_byday2 <- ac2 %>% group_by(date) %>% summarize(steps_count2 = sum(steps2))
+head(steps_byday2)
+meansteps2 <- mean(steps_byday2$steps_count2)
+mediansteps2 <- median(steps_byday2$steps_count2)
+hist(steps_byday$steps_count,col=rgb(1,0,0,0.5),ylim=c(0,40))
+hist(steps_byday2$steps_count2,col=rgb(0,1,0,0.5),add=T)
+legend("right",legend=c("no imputation","imputed mean steps for the interval"),col=c(rgb(1,0,0),rgb(0,1,0)),lwd=3,cex=.8)
+abline(v=meansteps2,col="green",lwd=1)
+abline(v=mean_steps_ignorena,col="red",lwd=3)
+abline(v=mediansteps2,col="green",lty=2,lwd=1)
+abline(v=median_steps_ignorena,col="red",lty=2,lwd=3)
+print(meansteps2)
+print(mean_steps_ignorena)
+print(mediansteps2)
+print(median_steps_ignorena)
+```
+
+Strategy 2 has changed the distribution of steps per day somewhat - makes it look more normal. 
+The mean value has shifted to the right (dashed line is for imputed data, solid line is without imputation).
+Also of interest: the mean and median values for the imputed data are the same. 
+
+##4.  Are there differences in activity patterns between weekdays and weekends?
+
+Strategy1 will be tested for time series plots by weekday/weekend
+
+```{r, include=TRUE, results=TRUE}
+library(lubridate)
+ac1$date1 <- as.POSIXct(strptime(ac1$date,"%Y-%m-%d"))
+ac1$weeknum <- wday(ac1$date)
+ac1$weektype <- factor(ac1$weeknum,levels = 1:7, labels = c("weekend",rep("weekday",length=5),"weekend"))
+
+mnsteps1f  <- ac1 %>% group_by(weektype,interval) %>% summarize(meansteps1 = mean(steps1))
+print(mnsteps1f[1:5,])
+library(lattice)
+xyplot(mnsteps1f$meansteps1 ~ mnsteps1f$interval|mnsteps1f$weektype,type="l",layout=c(1,2))
